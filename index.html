@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brainstorm Imposter</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f6f7fb;color:#172033}
+main{max-width:860px;margin:auto;padding:20px}.card{background:#fff;border:1px solid #dfe4ee;border-radius:20px;padding:20px;margin-bottom:16px}
+h1{margin:0 0 6px}.muted{color:#667085}.hidden{display:none!important}
+button,select{font-size:16px;padding:12px;border-radius:10px;border:1px solid #dfe4ee}
+button{font-weight:700;cursor:pointer}.primary{background:#5b5bd6;color:#fff;border:0}
+.tabs,.rounds{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.center{text-align:center}
+.category{font-size:28px;font-weight:800}.role{padding:22px;border-radius:16px;text-align:center;margin-top:16px}
+.crew{background:#eaf8f3}.imposter{background:#fdecef}.roleTitle{font-size:34px;font-weight:900}.secret{font-size:30px;font-weight:900;margin:12px 0}
+.qrbox{width:230px;min-height:230px;margin:14px auto;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #dfe4ee;border-radius:14px;padding:10px}.qrbox canvas,.qrbox img{max-width:210px!important;height:auto!important}.note{background:#fff7df;padding:12px;border-radius:12px}
+.step{padding:10px 0;border-bottom:1px solid #eee}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.category{font-size:24px}}
+</style>
+</head>
+<body>
+<main>
+<div class="card">
+<h1>🕵️ Brainstorm Imposter</h1>
+<p class="muted">Chapter 4 UX brainstorming activity</p>
+<div class="tabs"><button id="presenterTab" class="primary">Presenter View</button><button id="studentTab">Student View</button></div>
+</div>
+
+<section id="presenterView">
+<div class="card center">
+<div id="pround"><b>Round 1 of 3</b></div>
+<h2>Scan to reveal your private role</h2>
+<div id="qrcode" class="qrbox" aria-label="QR code"></div>
+<p id="qrStatus" class="muted">Generating QR code…</p>
+<p id="link" class="muted"></p>
+<div class="note">Before scanning, number each team clockwise: 1, 2, 3, 4, 5, 6.</div>
+</div>
+
+<div class="card center">
+<p class="muted">CATEGORY · EVERYONE MAY SEE THIS</p>
+<div id="pcategory" class="category"></div>
+<div class="rounds">
+<button data-r="1" class="rbtn primary">Round 1</button>
+<button data-r="2" class="rbtn">Round 2</button>
+<button data-r="3" class="rbtn">Round 3</button>
+</div>
+</div>
+
+<div class="card">
+<h2>How to run it</h2>
+<div class="step"><b>1.</b> Students scan, then choose team + seat number.</div>
+<div class="step"><b>2.</b> They tap <b>Reveal My Role</b> privately.</div>
+<div class="step"><b>3.</b> Go around 3 laps, one feature idea per person per lap.</div>
+<div class="step"><b>4.</b> Everyone points to their suspected Imposter on 3.</div>
+<div class="step"><b>5.</b> If caught, the Imposter gets one guess at the secret topic.</div>
+</div>
+</section>
+
+<section id="studentView" class="hidden">
+<div class="card">
+<div id="sround"><b>Round 1 of 3</b></div>
+<h2>Choose your team and seat</h2>
+<div class="grid">
+<div><label>Project Team</label><br><select id="team">
+<option>1</option><option>2</option><option>3</option><option>4</option>
+<option>5</option><option>6</option><option>7</option><option>8</option>
+</select></div>
+<div><label>Seat Number</label><br><select id="seat">
+<option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
+</select></div>
+</div>
+<button id="reveal" class="primary" style="width:100%;margin-top:14px">Reveal My Role</button>
+<div id="role" class="hidden"></div>
+<button id="hide" class="hidden" style="width:100%;margin-top:12px">Hide My Role</button>
+</div>
+<div class="card center"><p class="muted">CATEGORY · SAFE TO SHOW</p><div id="scategory" class="category"></div></div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+<script>
+const rounds={
+1:{category:"A website for a local business",topic:"A pizza shop"},
+2:{category:"An app",topic:"A dating app for dogs"},
+3:{category:"A website you use every week",topic:"Brightspace"}
+};
+let params=new URLSearchParams(location.search);
+let round=Number(params.get("round"))||1;
+let mode=params.get("mode")==="student"?"student":"presenter";
+
+const pview=document.getElementById("presenterView"),sview=document.getElementById("studentView");
+const ptab=document.getElementById("presenterTab"),stab=document.getElementById("studentTab");
+const role=document.getElementById("role"),reveal=document.getElementById("reveal"),hide=document.getElementById("hide");
+
+function imposterSeat(team,r){return ((team + r*2 - 2)%6)+1}
+function studentURL(){
+  const u=new URL(location.href);u.search="";
+  u.searchParams.set("mode","student");u.searchParams.set("round",round);return u.toString()
+}
+function updateQR(){
+  const u=studentURL();
+  document.getElementById("link").textContent=u;
+  const box=document.getElementById("qrcode");
+  const status=document.getElementById("qrStatus");
+  box.innerHTML="";
+  if(typeof QRCode==="undefined"){
+    status.textContent="QR library did not load. Use the student link below, or reopen this file while connected to the internet.";
+    return;
+  }
+  try{
+    new QRCode(box,{
+      text:u,
+      width:210,
+      height:210,
+      colorDark:"#000000",
+      colorLight:"#ffffff",
+      correctLevel:QRCode.CorrectLevel.M
+    });
+    status.textContent = location.protocol==="file:"
+      ? "This file is running locally. The QR will not work on other phones until this page is hosted online."
+      : "QR ready — students can scan this.";
+  }catch(e){
+    status.textContent="Could not generate QR. Use the student link below.";
+  }
+}
+function setMode(m){
+  mode=m;pview.classList.toggle("hidden",m!=="presenter");sview.classList.toggle("hidden",m!=="student");
+  ptab.classList.toggle("primary",m==="presenter");stab.classList.toggle("primary",m==="student");
+  if(m==="presenter")updateQR();
+}
+function setRound(r){
+  round=r;const d=rounds[r];
+  document.getElementById("pround").innerHTML="<b>Round "+r+" of 3</b>";
+  document.getElementById("sround").innerHTML="<b>Round "+r+" of 3</b>";
+  document.getElementById("pcategory").textContent=d.category;
+  document.getElementById("scategory").textContent=d.category;
+  document.querySelectorAll(".rbtn").forEach(b=>b.classList.toggle("primary",Number(b.dataset.r)===r));
+  role.className="hidden";role.innerHTML="";hide.classList.add("hidden");reveal.classList.remove("hidden");
+  const u=new URL(location.href);u.searchParams.set("round",r);history.replaceState(null,"",u);
+  updateQR();
+}
+ptab.onclick=()=>setMode("presenter");stab.onclick=()=>setMode("student");
+document.querySelectorAll(".rbtn").forEach(b=>b.onclick=()=>setRound(Number(b.dataset.r)));
+reveal.onclick=()=>{
+  const team=Number(document.getElementById("team").value),seat=Number(document.getElementById("seat").value);
+  const imp=seat===imposterSeat(team,round),d=rounds[round];
+  role.className="role "+(imp?"imposter":"crew");
+  role.innerHTML=imp
+  ?'<div class="roleTitle">🔴 IMPOSTER</div><p>You do <b>not</b> know the secret topic.</p><p>Listen carefully, blend in, and figure it out.</p>'
+  :'<div class="roleTitle">🟢 CREW</div><div class="muted">SECRET TOPIC</div><div class="secret">'+d.topic+'</div><p>Brainstorm features without saying the topic directly.</p>';
+  reveal.classList.add("hidden");hide.classList.remove("hidden");
+}
+hide.onclick=()=>{role.className="hidden";role.innerHTML="";hide.classList.add("hidden");reveal.classList.remove("hidden")}
+setRound(round);setMode(mode);
+</script>
+</body>
+</html>
